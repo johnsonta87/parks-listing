@@ -3,6 +3,23 @@ import type { Park, ParkType } from '@/services/google-maps';
 const GOOGLE_PLACES_TEXT_SEARCH_ENDPOINT =
   'https://maps.googleapis.com/maps/api/place/textsearch/json';
 
+// Province bounding boxes (approximate coordinates)
+const PROVINCE_BOUNDS: Record<string, { minLat: number; maxLat: number; minLng: number; maxLng: number }> = {
+  'Alberta': { minLat: 49.0, maxLat: 60.0, minLng: -120.0, maxLng: -110.0 },
+  'British Columbia': { minLat: 49.0, maxLat: 60.0, minLng: -139.0, maxLng: -114.0 },
+  'Manitoba': { minLat: 49.0, maxLat: 60.5, minLng: -102.0, maxLng: -95.0 },
+  'New Brunswick': { minLat: 45.0, maxLat: 47.8, minLng: -67.5, maxLng: -64.0 },
+  'Newfoundland and Labrador': { minLat: 47.0, maxLat: 60.5, minLng: -63.0, maxLng: -52.0 },
+  'Northwest Territories': { minLat: 60.0, maxLat: 83.0, minLng: -141.0, maxLng: -60.0 },
+  'Nova Scotia': { minLat: 43.5, maxLat: 47.0, minLng: -66.0, maxLng: -59.5 },
+  'Nunavut': { minLat: 60.0, maxLat: 83.0, minLng: -141.0, maxLng: -60.0 },
+  'Ontario': { minLat: 41.7, maxLat: 56.9, minLng: -95.2, maxLng: -74.3 },
+  'Prince Edward Island': { minLat: 45.9, maxLat: 47.1, minLng: -64.5, maxLng: -61.9 },
+  'Quebec': { minLat: 45.0, maxLat: 63.0, minLng: -79.0, maxLng: -57.0 },
+  'Saskatchewan': { minLat: 49.0, maxLat: 60.0, minLng: -110.0, maxLng: -102.0 },
+  'Yukon': { minLat: 60.0, maxLat: 69.5, minLng: -141.0, maxLng: -124.0 },
+};
+
 
 type GooglePlacesTextSearchResult = {
   place_id: string;
@@ -77,11 +94,31 @@ async function searchParksByQuery(query: string, apiKey: string) {
   return payload.results;
 }
 
-function normalizeAndSortParks(resultsByQuery: GooglePlacesTextSearchResult[][], apiKey: string): Park[] {
+function isWithinProvinceBounds(location: { lat: number; lng: number } | undefined, province: string): boolean {
+  if (!location) return true; // If no location data, include the result
+
+  const bounds = PROVINCE_BOUNDS[province];
+  if (!bounds) return true; // If province not in bounds map, include the result
+
+  const { lat, lng } = location;
+  return (
+    lat >= bounds.minLat &&
+    lat <= bounds.maxLat &&
+    lng >= bounds.minLng &&
+    lng <= bounds.maxLng
+  );
+}
+
+function normalizeAndSortParks(resultsByQuery: GooglePlacesTextSearchResult[][], apiKey: string, province: string): Park[] {
   const uniqueParks = new Map<string, Park>();
 
   for (const resultSet of resultsByQuery) {
     for (const park of resultSet) {
+      // Filter out parks that are outside the province bounds
+      if (!isWithinProvinceBounds(park.geometry?.location, province)) {
+        continue;
+      }
+
       const photoUrl = park.photos?.[0]
         ? buildPhotoUrl(park.photos[0].photo_reference, apiKey)
         : undefined;
@@ -130,7 +167,7 @@ export async function GET(request: Request) {
     const apiKey = getApiKey();
     const queries = buildQueries(province, parkTypeParam);
     const resultsByQuery = await Promise.all(queries.map((query) => searchParksByQuery(query, apiKey)));
-    const parks = normalizeAndSortParks(resultsByQuery, apiKey);
+    const parks = normalizeAndSortParks(resultsByQuery, apiKey, province);
 
     return Response.json({ parks });
   } catch (error) {

@@ -55,6 +55,11 @@ const toggleFilterLogic = (
   };
 };
 
+const isNationalLabeledPark = (park: Park) => {
+  // In national-only mode, show only parks explicitly labeled as national.
+  return /\bnational\b/i.test(`${park.name} ${park.address}`);
+};
+
 export default function HomeScreen() {
   const [selectedProvince, setSelectedProvince] = useState<typeof PROVINCES[number]>('Ontario');
   const [isProvinceDropdownOpen, setIsProvinceDropdownOpen] = useState(false);
@@ -72,7 +77,17 @@ export default function HomeScreen() {
     return selectedFilters.national ? 'national' : 'provincial';
   }, [selectedFilters.national, selectedFilters.provincial]);
 
-  const { parks, isLoading, errorMessage } = useParksFetch([selectedProvince], selectedFilter);
+  const selectedProvinces = useMemo(() => [selectedProvince], [selectedProvince]);
+
+  const { parks, isLoading, errorMessage } = useParksFetch(selectedProvinces, selectedFilter);
+
+  const visibleParks = useMemo(() => {
+    if (selectedFilter !== 'national') {
+      return parks;
+    }
+
+    return parks.filter((park) => isNationalLabeledPark(park));
+  }, [parks, selectedFilter]);
 
   // Reset to page 1 when province or filters change
   useEffect(() => {
@@ -80,10 +95,10 @@ export default function HomeScreen() {
   }, [selectedProvince, selectedFilter]);
 
   // Calculate pagination values
-  const totalPages = Math.ceil(parks.length / PARKS_PER_PAGE);
+  const totalPages = Math.ceil(visibleParks.length / PARKS_PER_PAGE);
   const startIndex = (currentPage - 1) * PARKS_PER_PAGE;
   const endIndex = startIndex + PARKS_PER_PAGE;
-  const paginatedParks = parks.slice(startIndex, endIndex);
+  const paginatedParks = visibleParks.slice(startIndex, endIndex);
 
   const goToPreviousPage = () => {
     if (currentPage > 1) {
@@ -98,8 +113,8 @@ export default function HomeScreen() {
   };
 
   // Calculate display info
-  const showNoParkMessage = !isLoading && !errorMessage && parks.length === 0;
-  const showParkCards = !isLoading && !errorMessage && parks.length > 0;
+  const showNoParkMessage = !isLoading && !errorMessage && visibleParks.length === 0;
+  const showParkCards = !isLoading && !errorMessage && visibleParks.length > 0;
   const showPaginationControls = showParkCards;
 
   const selectProvince = (province: typeof PROVINCES[number]) => {
@@ -153,7 +168,9 @@ export default function HomeScreen() {
                         accessibilityRole="button"
                         onPress={() => selectProvince(province)}
                         style={[styles.dropdownOption, selected && styles.dropdownOptionSelected]}>
-                        <ThemedText style={styles.filterText}>{province}</ThemedText>
+                        <ThemedText style={[styles.filterText, selected && styles.dropdownOptionSelectedText]}>
+                          {province}
+                        </ThemedText>
                       </Pressable>
                     );
                   })}
@@ -195,7 +212,7 @@ export default function HomeScreen() {
 
             {showParkCards
               ? paginatedParks.map((park) => (
-                  <Pressable key={park.placeId ?? park.name} style={styles.parkCard} onPress={() => void openInMaps(park)}>
+                  <ThemedView key={park.placeId ?? park.name} style={styles.parkCard}>
                     {park.photoUrl ? (
                       <Image source={{ uri: park.photoUrl }} style={styles.parkImage} />
                     ) : null}
@@ -210,8 +227,14 @@ export default function HomeScreen() {
                           {park.totalRatings ? ` (${park.totalRatings} reviews)` : ''}
                         </ThemedText>
                       ) : null}
+                      <Pressable
+                        accessibilityRole="link"
+                        accessibilityLabel={`Open ${park.name} in Google Maps`}
+                        onPress={() => void openInMaps(park)}>
+                        <ThemedText style={styles.parkMapLinkText}>Click to view in google maps</ThemedText>
+                      </Pressable>
                     </ThemedView>
-                  </Pressable>
+                  </ThemedView>
                 ))
               : null}
 
@@ -300,9 +323,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 10,
   },
-  dropdownOptionSelected: {
-    backgroundColor: '#E6F4F8',
-  },
+   dropdownOptionSelected: {
+     backgroundColor: '#E6F4F8',
+   },
+   dropdownOptionSelectedText: {
+     color: '#000000',
+   },
   filterRow: {
     flexDirection: 'column',
     gap: 10,
@@ -364,6 +390,12 @@ const styles = StyleSheet.create({
   },
   parkRating: {
     flexShrink: 1,
+  },
+  parkMapLinkText: {
+    color: '#0A7EA4',
+    fontWeight: '600',
+    marginTop: 8,
+    textDecorationLine: 'underline',
   },
   errorText: {
     color: '#B42318',

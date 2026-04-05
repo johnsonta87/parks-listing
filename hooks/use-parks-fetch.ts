@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { findParksByProvince, type Park, type ParkType } from '@/services/google-maps';
 
@@ -6,8 +6,10 @@ export function useParksFetch(provinces: readonly string[], parkType: ParkType) 
   const [parks, setParks] = useState<Park[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const requestIdRef = useRef(0);
 
   const refetch = useCallback(async () => {
+    const requestId = ++requestIdRef.current;
     setIsLoading(true);
     setErrorMessage(null);
 
@@ -25,13 +27,19 @@ export function useParksFetch(provinces: readonly string[], parkType: ParkType) 
         }
       }
 
-      setParks([...uniqueParks.values()]);
+      if (requestId === requestIdRef.current) {
+        setParks([...uniqueParks.values()]);
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unable to fetch parks right now.';
-      setErrorMessage(message);
-      setParks([]);
+      if (requestId === requestIdRef.current) {
+        setErrorMessage(message);
+        setParks([]);
+      }
     } finally {
-      setIsLoading(false);
+      if (requestId === requestIdRef.current) {
+        setIsLoading(false);
+      }
     }
   }, [parkType, provinces]);
 
