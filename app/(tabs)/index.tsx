@@ -6,9 +6,9 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
+  useWindowDimensions,
 } from 'react-native';
 
-import ParallaxScrollView from '@/components/parallax-scroll-view';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { useParksFetch } from '@/hooks/use-parks-fetch';
@@ -61,6 +61,9 @@ const isNationalLabeledPark = (park: Park) => {
 };
 
 export default function HomeScreen() {
+  const { width } = useWindowDimensions();
+  const isMobile = width < 768;
+
   const [selectedProvince, setSelectedProvince] = useState<typeof PROVINCES[number]>('Ontario');
   const [isProvinceDropdownOpen, setIsProvinceDropdownOpen] = useState(false);
   const [selectedFilters, setSelectedFilters] = useState<Record<'national' | 'provincial', boolean>>({
@@ -136,16 +139,14 @@ export default function HomeScreen() {
   };
 
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={<Image source={require('@/assets/images/partial-react-logo.png')} style={styles.reactLogo} />}>
+    <ScrollView style={styles.container} contentContainerStyle={styles.containerContent}>
       <ThemedView style={styles.titleContainer}>
         <ThemedText type="title">Parks Finder</ThemedText>
       </ThemedView>
 
-      <ThemedView style={styles.mainContainer}>
+      <ThemedView style={[styles.mainContainer, isMobile && styles.mainContainerMobile]}>
         {/* Left Column - Filters */}
-        <ThemedView style={styles.leftColumn}>
+        <ThemedView style={[styles.leftColumn, isMobile && styles.leftColumnMobile]}>
           <ThemedView style={styles.section}>
             <ThemedText type="subtitle">Province</ThemedText>
             <ThemedView style={styles.dropdownContainer}>
@@ -200,7 +201,7 @@ export default function HomeScreen() {
         </ThemedView>
 
         {/* Right Column - Listings */}
-        <ThemedView style={styles.rightColumn}>
+        <ThemedView style={[styles.rightColumn, isMobile && styles.rightColumnMobile]}>
           <ThemedView style={styles.section}>
             {isLoading ? <ActivityIndicator size="small" /> : null}
 
@@ -212,9 +213,9 @@ export default function HomeScreen() {
 
             {showParkCards
               ? paginatedParks.map((park) => (
-                  <ThemedView key={park.placeId ?? park.name} style={styles.parkCard}>
+                  <ThemedView key={park.placeId ?? park.name} style={[styles.parkCard, isMobile && styles.parkCardMobile]}>
                     {park.photoUrl ? (
-                      <Image source={{ uri: park.photoUrl }} style={styles.parkImage} />
+                      <Image source={{ uri: park.photoUrl }} style={[styles.parkImage, isMobile && styles.parkImageMobile]} />
                     ) : null}
                     <ThemedView style={styles.parkCardContent}>
                       <ThemedText type="defaultSemiBold" style={styles.parkName}>
@@ -268,19 +269,29 @@ export default function HomeScreen() {
           </ThemedView>
         </ThemedView>
       </ThemedView>
-    </ParallaxScrollView>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    padding: 32,
+  },
+  containerContent: {
+    alignItems: 'center',
+  },
   titleContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+    marginBottom: 24,
   },
   mainContainer: {
     flexDirection: 'row',
     gap: 16,
+    width: '100%',
+    padding: 32,
   },
   leftColumn: {
     flex: 1,
@@ -440,5 +451,30 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     position: 'absolute',
+  },
+  mainContainerMobile: {
+    flexDirection: 'column',
+    gap: 16,
+  },
+  leftColumnMobile: {
+    flex: 'auto' as any,
+    paddingRight: 0,
+    paddingBottom: 0,
+  },
+  rightColumnMobile: {
+    flex: 'auto' as any,
+    paddingLeft: 0,
+  },
+  parkCardMobile: {
+    flexDirection: 'column',
+    paddingTop: 12,
+    paddingBottom: 0,
+    paddingHorizontal: 12,
+    marginBottom: 12,
+  },
+  parkImageMobile: {
+    width: '100%',
+    height: 200,
+    marginBottom: 12,
   },
 });
