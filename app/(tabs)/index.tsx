@@ -6,12 +6,14 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
+  TextInput,
   useWindowDimensions,
 } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { useParksFetch } from '@/hooks/use-parks-fetch';
+import { useThemeColor } from '@/hooks/use-theme-color';
 import type { Park, ParkType } from '@/services/google-maps';
 
 const PROVINCES = [
@@ -64,8 +66,12 @@ export default function HomeScreen() {
   const { width } = useWindowDimensions();
   const isMobile = width < 768;
 
+  const inputTextColor = useThemeColor({}, 'text');
+  const inputBgColor = useThemeColor({}, 'background');
+
   const [selectedProvince, setSelectedProvince] = useState<typeof PROVINCES[number]>('Ontario');
   const [isProvinceDropdownOpen, setIsProvinceDropdownOpen] = useState(false);
+  const [cityFilter, setCityFilter] = useState('');
   const [selectedFilters, setSelectedFilters] = useState<Record<'national' | 'provincial', boolean>>({
     national: true,
     provincial: true,
@@ -85,17 +91,28 @@ export default function HomeScreen() {
   const { parks, isLoading, errorMessage } = useParksFetch(selectedProvinces, selectedFilter);
 
   const visibleParks = useMemo(() => {
-    if (selectedFilter !== 'national') {
-      return parks;
+    let filtered = parks;
+
+    if (selectedFilter === 'national') {
+      filtered = filtered.filter((park) => isNationalLabeledPark(park));
     }
 
-    return parks.filter((park) => isNationalLabeledPark(park));
-  }, [parks, selectedFilter]);
+    if (cityFilter.trim()) {
+      const normalizedCity = cityFilter.trim().toLowerCase();
+      filtered = filtered.filter(
+        (park) =>
+          park.address.toLowerCase().includes(normalizedCity) ||
+          park.name.toLowerCase().includes(normalizedCity)
+      );
+    }
 
-  // Reset to page 1 when province or filters change
+    return filtered;
+  }, [parks, selectedFilter, cityFilter]);
+
+  // Reset to page 1 when province, filters, or city changes
   useEffect(() => {
     setCurrentPage(1);
-  }, [selectedProvince, selectedFilter]);
+  }, [selectedProvince, selectedFilter, cityFilter]);
 
   // Calculate pagination values
   const totalPages = Math.ceil(visibleParks.length / PARKS_PER_PAGE);
@@ -178,6 +195,20 @@ export default function HomeScreen() {
                 </ScrollView>
               ) : null}
             </ThemedView>
+          </ThemedView>
+
+          <ThemedView style={styles.section}>
+            <ThemedText type="subtitle">City</ThemedText>
+            <TextInput
+              style={[styles.cityInput, { color: inputTextColor, backgroundColor: inputBgColor }]}
+              placeholder="Filter by city…"
+              placeholderTextColor="#9AA3AA"
+              value={cityFilter}
+              onChangeText={setCityFilter}
+              clearButtonMode="while-editing"
+              autoCorrect={false}
+              autoCapitalize="words"
+            />
           </ThemedView>
 
           <ThemedView style={styles.section}>
@@ -361,6 +392,14 @@ const styles = StyleSheet.create({
     borderColor: '#0A7EA4',
   },
   filterText: {
+    fontSize: 15,
+  },
+  cityInput: {
+    borderWidth: 1,
+    borderColor: '#B4BDC3',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
     fontSize: 15,
   },
   filterTextSelected: {
