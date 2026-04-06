@@ -37,7 +37,7 @@ const PARK_FILTERS: { value: ParkType; label: string }[] = [
   { value: 'provincial', label: 'Provincial' },
 ];
 
-const PARKS_PER_PAGE = 10;
+const PARKS_PER_PAGE = 5;
 
 const toggleFilterLogic = (
   value: 'national' | 'provincial',
@@ -322,6 +322,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 16,
     width: '100%',
+    maxWidth: 1150,
     padding: 32,
   },
   leftColumn: {
